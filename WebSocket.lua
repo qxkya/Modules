@@ -47,8 +47,9 @@ function WebSocketModule:Connect()
     
     if self.connection then
         self.connection.OnMessage:Connect(function(message)
+            local data = self:ParseMessage(message)
+
             if self.messageListeners then
-                local data = self:ParseMessage(message)
                 if data and data.type and self.messageListeners[data.type] then
                     for _, listener in ipairs(self.messageListeners[data.type]) do
                         local success, result = pcall(listener, data)
@@ -60,7 +61,7 @@ function WebSocketModule:Connect()
             end
             
             if self.callbacks.onMessage then
-                local success, result = pcall(self.callbacks.onMessage, message)
+                local success, result = pcall(self.callbacks.onMessage, data)
                 if not success then
                     warn("Error in general OnMessage callback:", result)
                 end
@@ -80,6 +81,18 @@ function WebSocketModule:Connect()
     end
     
     return true
+end
+
+function WebSocketModule:ParseMessage(message)
+    local success, data = pcall(function()
+        return game:GetService("HttpService"):JSONDecode(message)
+    end)
+    
+    if success then
+        return data
+    else
+        return nil
+    end
 end
 
 function WebSocketModule:Send(data)
@@ -157,18 +170,6 @@ function WebSocketModule:IsConnected()
     return self.readyState == OPEN
 end
 
-function WebSocketModule:ParseMessage(message)
-    local success, data = pcall(function()
-        return game:GetService("HttpService"):JSONDecode(message)
-    end)
-    
-    if success then
-        return data
-    else
-        return nil
-    end
-end
-
 function WebSocketModule:Listen(messageType, callback)
     if not self.messageListeners then
         self.messageListeners = {}
@@ -179,6 +180,26 @@ function WebSocketModule:Listen(messageType, callback)
     end
     
     table.insert(self.messageListeners[messageType], callback)
+    
+    if #self.messageListeners[messageType] == 1 then
+        local originalOnMessage = self.callbacks.onMessage
+        
+        self:OnMessage(function(message)
+            local data = self:ParseMessage(message)
+            if data and data.type == messageType then
+                for _, listener in ipairs(self.messageListeners[messageType]) do
+                    local success, result = pcall(listener, data)
+                    if not success then
+                        warn("Error in message listener for type '" .. messageType .. "':", result)
+                    end
+                end
+            end
+            
+            if originalOnMessage then
+                originalOnMessage(message)
+            end
+        end)
+    end
 end
 
 function WebSocketModule:CreateMessage(messageType, data, additionalData)
