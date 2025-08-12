@@ -180,26 +180,6 @@ function WebSocketModule:Listen(messageType, callback)
     end
     
     table.insert(self.messageListeners[messageType], callback)
-    
-    if #self.messageListeners[messageType] == 1 then
-        local originalOnMessage = self.callbacks.onMessage
-        
-        self:OnMessage(function(message)
-            local data = self:ParseMessage(message)
-            if data and data.type == messageType then
-                for _, listener in ipairs(self.messageListeners[messageType]) do
-                    local success, result = pcall(listener, data)
-                    if not success then
-                        warn("Error in message listener for type '" .. messageType .. "':", result)
-                    end
-                end
-            end
-            
-            if originalOnMessage then
-                originalOnMessage(message)
-            end
-        end)
-    end
 end
 
 function WebSocketModule:CreateMessage(messageType, data, additionalData)
