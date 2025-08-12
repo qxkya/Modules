@@ -47,8 +47,23 @@ function WebSocketModule:Connect()
     
     if self.connection then
         self.connection.OnMessage:Connect(function(message)
+            if self.messageListeners then
+                local data = self:ParseMessage(message)
+                if data and data.type and self.messageListeners[data.type] then
+                    for _, listener in ipairs(self.messageListeners[data.type]) do
+                        local success, result = pcall(listener, data)
+                        if not success then
+                            warn("Error in message listener for type '" .. data.type .. "':", result)
+                        end
+                    end
+                end
+            end
+            
             if self.callbacks.onMessage then
-                self.callbacks.onMessage(message)
+                local success, result = pcall(self.callbacks.onMessage, message)
+                if not success then
+                    warn("Error in general OnMessage callback:", result)
+                end
             end
         end)
         
@@ -152,6 +167,18 @@ function WebSocketModule:ParseMessage(message)
     else
         return nil
     end
+end
+
+function WebSocketModule:Listen(messageType, callback)
+    if not self.messageListeners then
+        self.messageListeners = {}
+    end
+    
+    if not self.messageListeners[messageType] then
+        self.messageListeners[messageType] = {}
+    end
+    
+    table.insert(self.messageListeners[messageType], callback)
 end
 
 function WebSocketModule:CreateMessage(messageType, data, additionalData)
