@@ -48,7 +48,7 @@ function WebSocketModule:Connect()
     if self.connection then
         self.connection.OnMessage:Connect(function(message)
             local data = self:ParseMessage(message)
-
+            
             if self.messageListeners then
                 if data and data.type and self.messageListeners[data.type] then
                     for _, listener in ipairs(self.messageListeners[data.type]) do
